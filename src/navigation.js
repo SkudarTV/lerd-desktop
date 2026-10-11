@@ -12,4 +12,14 @@ function navigation(url) {
   return 'external'
 }
 
-module.exports = { navigation, DASHBOARD_ORIGIN }
+// isDashboard compares origins rather than strings: Electron 44 hands the
+// permission handlers the origin with a trailing slash.
+function isDashboard(url) {
+  try {
+    return new URL(url).origin === DASHBOARD_ORIGIN
+  } catch {
+    return false
+  }
+}
+
+module.exports = { navigation, isDashboard, DASHBOARD_ORIGIN }

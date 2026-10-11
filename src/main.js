@@ -4,7 +4,7 @@ const path = require('node:path')
 const { app, BrowserWindow, Menu, shell, ipcMain, session, screen } = require('electron')
 const { probe, dashboardURL } = require('./detect')
 const windowstate = require('./windowstate')
-const { navigation, DASHBOARD_ORIGIN } = require('./navigation')
+const { navigation, isDashboard } = require('./navigation')
 
 const STATE_FILE = 'window-state.json'
 const SAVE_DELAY_MS = 400
@@ -15,13 +15,10 @@ const SAVE_DELAY_MS = 400
 // dashboard origin is trusted; everything else is denied.
 function grantDashboardPermissions() {
   const ses = session.defaultSession
-  const trusted = (url) => typeof url === 'string' && url.startsWith(DASHBOARD_ORIGIN)
   ses.setPermissionRequestHandler((_wc, _permission, callback, details) => {
-    callback(trusted(details.requestingUrl))
+    callback(isDashboard(details.requestingUrl))
   })
-  ses.setPermissionCheckHandler((_wc, _permission, requestingOrigin) => {
-    return requestingOrigin === DASHBOARD_ORIGIN
-  })
+  ses.setPermissionCheckHandler((_wc, _permission, requestingOrigin) => isDashboard(requestingOrigin))
 }
 
 // Set before the app is ready so the Linux WM_CLASS / Wayland app_id identifies
