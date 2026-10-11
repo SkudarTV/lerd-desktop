@@ -49,6 +49,11 @@
   </branding>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.5" date="2026-10-11">
+      <description>
+        <p>Brings back your dashboard settings, theme and notifications after the move to Electron 44, and draws the header in the same tone as the window's title bar again.</p>
+      </description>
+    </release>
     <release version="0.1.4" date="2026-10-11">
       <description>
         <p>Runs on Electron 44 and the 26.08 runtime.</p>
