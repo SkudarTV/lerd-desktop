@@ -13,10 +13,13 @@
 [![Docs](https://img.shields.io/badge/docs-lerd.sh-blue)](https://lerd.sh)
 [![Companion to Lerd](https://img.shields.io/badge/for-Lerd-ff2d20)](https://github.com/lerd-env/lerd)
 
+![The Lerd dashboard](flatpak/screenshots/dashboard.png)
+
 </div>
 
-Lerd Desktop is the companion app for [Lerd](https://lerd.sh), the rootless,
-Podman-native local PHP development environment. It wraps the Lerd dashboard in a
+Lerd Desktop is the companion app for [Lerd](https://lerd.sh)
+([source](https://github.com/lerd-env/lerd)), the rootless, Podman-native local
+PHP development environment. It wraps the Lerd dashboard in a
 sandboxed native window and lets the Lerd daemon pop **native desktop
 notifications** — for captured mail, worker failures, and finished operations —
 so you can stop keeping a browser tab open just to catch them.
