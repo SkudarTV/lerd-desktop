@@ -27,6 +27,10 @@ function grantDashboardPermissions() {
 // icon; in the dev run it reads "Lerd" for a clean taskbar label.
 app.setName(process.env.FLATPAK_ID || 'Lerd')
 
+// Chromium's Wayland color management lifts dark tones on KDE (#292c30 is drawn
+// as #2d3033), so the header no longer matches the window's own title bar.
+app.commandLine.appendSwitch('disable-features', 'WaylandWpColorManagerV1')
+
 // Claim the lerd:// scheme so clicking a native notification from the daemon
 // focuses this window at the right route. Under Flatpak the manifest's desktop
 // entry already registers it, and the host tool this shells out to (xdg-settings)
