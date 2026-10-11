@@ -1,9 +1,9 @@
 app-id: sh.lerd.Desktop
 runtime: org.freedesktop.Platform
-runtime-version: '25.08'
+runtime-version: '26.08'
 sdk: org.freedesktop.Sdk
 base: org.electronjs.Electron2.BaseApp
-base-version: '25.08'
+base-version: '26.08'
 command: sh.lerd.Desktop
 separate-locales: false
 
@@ -49,13 +49,13 @@ modules:
         path: sh.lerd.Desktop.metainfo.xml
       - type: archive
         only-arches: [x86_64]
-        url: https://github.com/electron/electron/releases/download/v33.4.11/electron-v33.4.11-linux-x64.zip
-        sha256: 212d431c7c916292311c797cd91f84467c5abd6e6983cf24b162efff64cee8a9
+        url: https://github.com/electron/electron/releases/download/v44.7.0/electron-v44.7.0-linux-x64.zip
+        sha256: 3ae7d5bdad61c664486c6ab61361dd084d064c8c08af8d13a687096e18ce555a
         dest: main/electron
         strip-components: 0
       - type: archive
         only-arches: [aarch64]
-        url: https://github.com/electron/electron/releases/download/v33.4.11/electron-v33.4.11-linux-arm64.zip
-        sha256: e865132767e0930f5fef8ee146b9dd83c7f8fb95ed533c4de99e7057d5de5b61
+        url: https://github.com/electron/electron/releases/download/v44.7.0/electron-v44.7.0-linux-arm64.zip
+        sha256: 9cd736d1f5873839553c3fa6c8c5e57635ec4a399cc2d32e79c82a02d9cd2258
         dest: main/electron
         strip-components: 0
