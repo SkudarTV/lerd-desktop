@@ -4,8 +4,8 @@ const path = require('node:path')
 const { app, BrowserWindow, Menu, shell, ipcMain, session, screen } = require('electron')
 const { probe, dashboardURL } = require('./detect')
 const windowstate = require('./windowstate')
+const { navigation, DASHBOARD_ORIGIN } = require('./navigation')
 
-const DASHBOARD_ORIGIN = 'http://127.0.0.1:7073'
 const STATE_FILE = 'window-state.json'
 const SAVE_DELAY_MS = 400
 
@@ -130,6 +130,13 @@ function createWindow() {
 
   // Keep the window titled "Lerd" rather than inheriting the dashboard's <title>.
   mainWindow.on('page-title-updated', (e) => e.preventDefault())
+
+  mainWindow.webContents.on('will-navigate', (e, url) => {
+    const action = navigation(url)
+    if (action === 'allow') return
+    e.preventDefault()
+    if (action === 'external') shell.openExternal(url)
+  })
 
   // Dashboard links to external sites open in the real browser, not new windows.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
