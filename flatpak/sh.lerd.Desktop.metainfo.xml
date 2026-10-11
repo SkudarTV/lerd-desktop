@@ -49,6 +49,11 @@
   </branding>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.3" date="2026-10-11">
+      <description>
+        <p>The store listing gains screenshots, release notes and links to the source and issue tracker.</p>
+      </description>
+    </release>
     <release version="0.1.2" date="2026-09-23">
       <description>
         <p>Remembers the window size and position between launches, and can be switched to X11 through ELECTRON_OZONE_PLATFORM_HINT.</p>
