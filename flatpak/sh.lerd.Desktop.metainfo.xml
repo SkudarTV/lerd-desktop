@@ -15,11 +15,50 @@
       native desktop notifications for captured mail, worker failures, and
       finished operations, with no browser tab to keep open.
     </p>
+    <p>
+      This app is a companion to lerd and needs lerd installed on the host. lerd
+      runs Nginx, PHP-FPM and your databases as rootless Podman containers, and
+      serves its dashboard on your own machine. The app talks only to that local
+      dashboard.
+    </p>
+    <p>From the window you can:</p>
+    <ul>
+      <li>See your sites, services and queue workers at a glance</li>
+      <li>Switch PHP and Node versions per site and start or stop workers</li>
+      <li>Read request timing, slow routes, logs and captured mail</li>
+      <li>Open the main tabs straight from the taskbar</li>
+    </ul>
   </description>
   <launchable type="desktop-id">sh.lerd.Desktop.desktop</launchable>
   <url type="homepage">https://lerd.sh</url>
+  <url type="bugtracker">https://github.com/lerd-env/lerd-desktop/issues</url>
+  <url type="vcs-browser">https://github.com/lerd-env/lerd-desktop</url>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/lerd-env/lerd-desktop/v0.1.3/flatpak/screenshots/dashboard.png</image>
+      <caption>The dashboard with sites, services, workers and system health</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/lerd-env/lerd-desktop/v0.1.3/flatpak/screenshots/site.png</image>
+      <caption>A site with its workers, services and request timing</caption>
+    </screenshot>
+  </screenshots>
+  <branding>
+    <color type="primary" scheme_preference="light">#fecaca</color>
+    <color type="primary" scheme_preference="dark">#7f1d1d</color>
+  </branding>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.2" date="2026-09-23">
+      <description>
+        <p>Remembers the window size and position between launches, and can be switched to X11 through ELECTRON_OZONE_PLATFORM_HINT.</p>
+      </description>
+    </release>
+    <release version="0.1.1" date="2026-07-20">
+      <description>
+        <p>Taskbar quick actions open the main tabs directly.</p>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-07-19"/>
   </releases>
 </component>
