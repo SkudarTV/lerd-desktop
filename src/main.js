@@ -4,8 +4,8 @@ const path = require('node:path')
 const { app, BrowserWindow, Menu, shell, ipcMain, session, screen } = require('electron')
 const { probe, dashboardURL } = require('./detect')
 const windowstate = require('./windowstate')
+const { navigation, isDashboard } = require('./navigation')
 
-const DASHBOARD_ORIGIN = 'http://127.0.0.1:7073'
 const STATE_FILE = 'window-state.json'
 const SAVE_DELAY_MS = 400
 
@@ -15,13 +15,10 @@ const SAVE_DELAY_MS = 400
 // dashboard origin is trusted; everything else is denied.
 function grantDashboardPermissions() {
   const ses = session.defaultSession
-  const trusted = (url) => typeof url === 'string' && url.startsWith(DASHBOARD_ORIGIN)
   ses.setPermissionRequestHandler((_wc, _permission, callback, details) => {
-    callback(trusted(details.requestingUrl))
+    callback(isDashboard(details.requestingUrl))
   })
-  ses.setPermissionCheckHandler((_wc, _permission, requestingOrigin) => {
-    return requestingOrigin === DASHBOARD_ORIGIN
-  })
+  ses.setPermissionCheckHandler((_wc, _permission, requestingOrigin) => isDashboard(requestingOrigin))
 }
 
 // Set before the app is ready so the Linux WM_CLASS / Wayland app_id identifies
@@ -29,6 +26,10 @@ function grantDashboardPermissions() {
 // so KDE/Wayland matches the window to sh.lerd.Desktop.desktop and shows the
 // icon; in the dev run it reads "Lerd" for a clean taskbar label.
 app.setName(process.env.FLATPAK_ID || 'Lerd')
+
+// Chromium's Wayland color management lifts dark tones on KDE (#292c30 is drawn
+// as #2d3033), so the header no longer matches the window's own title bar.
+app.commandLine.appendSwitch('disable-features', 'WaylandWpColorManagerV1')
 
 // Claim the lerd:// scheme so clicking a native notification from the daemon
 // focuses this window at the right route. Under Flatpak the manifest's desktop
@@ -130,6 +131,13 @@ function createWindow() {
 
   // Keep the window titled "Lerd" rather than inheriting the dashboard's <title>.
   mainWindow.on('page-title-updated', (e) => e.preventDefault())
+
+  mainWindow.webContents.on('will-navigate', (e, url) => {
+    const action = navigation(url)
+    if (action === 'allow') return
+    e.preventDefault()
+    if (action === 'external') shell.openExternal(url)
+  })
 
   // Dashboard links to external sites open in the real browser, not new windows.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
