@@ -83,8 +83,9 @@ function busyLabel(action) {
 // state to its dot image; busy names an action still running, and while it
 // runs every other action waits. An item with a state stays enabled even
 // without an action, since Windows greys the icon of a disabled item; clicking
-// it does nothing.
-function menuFromTray(tray, { busy = '', icon, action, openDashboard }) {
+// it does nothing. The app's own quit follows lerd's Quit Lerd, which stops
+// lerd and leaves the app running.
+function menuFromTray(tray, { busy = '', icon, action, openDashboard, quitApp }) {
   const convert = (item) => {
     if (item.separator) return { type: 'separator' }
     const label = item.detail ? `${item.label}: ${item.detail}` : item.label
@@ -111,19 +112,25 @@ function menuFromTray(tray, { busy = '', icon, action, openDashboard }) {
   }
   const items = tray.items.map(convert)
   if (busy) items.unshift({ label: busy, enabled: false })
+  items.push(quitAppItem(quitApp))
   return items
+}
+
+// quitAppItem closes the app alone; lerd keeps running in WSL.
+function quitAppItem(quitApp) {
+  return { label: 'Quit Lerd Desktop', toolTip: 'Close this app and leave Lerd running', click: quitApp }
 }
 
 // downMenu is the tray while lerd's API does not answer: starting lerd through
 // the shim boots WSL on the way.
-function downMenu({ busy = '' }, { openDashboard, start, quit }) {
+function downMenu({ busy = '' }, { openDashboard, start, quitApp }) {
   return [
     { label: busy || 'Lerd is not running', enabled: false },
     { type: 'separator' },
     { label: 'Open Dashboard', click: openDashboard },
     { label: 'Start Lerd', enabled: !busy, click: start },
     { type: 'separator' },
-    { label: 'Quit', click: quit },
+    quitAppItem(quitApp),
   ]
 }
 

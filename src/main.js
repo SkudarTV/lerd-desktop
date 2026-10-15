@@ -19,7 +19,8 @@ const TRAY_HOVER_MS = 3000
 // dashboard keeps delivering notifications, and it starts hidden at login,
 // from the Run entry lerd's Windows installer writes.
 const IS_WINDOWS = process.platform === 'win32'
-const START_HIDDEN = process.argv.includes('--hidden')
+// Elsewhere there is no tray to bring a hidden window back from.
+const START_HIDDEN = IS_WINDOWS && process.argv.includes('--hidden')
 
 // The AppUserModelID lerd's own Windows toasts use. Sharing it gives the app's
 // notifications lerd's name and logo and a single "Lerd" entry in Windows'
@@ -154,6 +155,11 @@ function createWindow() {
       mainWindow.hide()
     }
   })
+  // Signing out or shutting down closes the window without passing through
+  // before-quit; hiding it then would hold Windows up.
+  mainWindow.on('session-end', () => {
+    quitting = true
+  })
 
   // Keep the window titled "Lerd" rather than inheriting the dashboard's <title>.
   mainWindow.on('page-title-updated', (e) => e.preventDefault())
@@ -221,6 +227,9 @@ function setupTray() {
     highContrast: menu ? menu.high_contrast_icon : false,
     darkTaskbar: nativeTheme.shouldUseDarkColorsForSystemIntegratedUI,
   }))
+  // Quitting the app leaves lerd running; lerd's own Quit Lerd stops lerd and
+  // leaves the app, which can start it again.
+  const quitApp = () => app.quit()
   const icon = new Tray(iconFile())
   icon.on('click', showWindow)
 
@@ -236,8 +245,9 @@ function setupTray() {
         },
         action: runAction,
         openDashboard: showWindow,
+        quitApp,
       })
-      : tray.downMenu({ busy }, { openDashboard: showWindow, start: startLerd, quit: () => app.quit() })
+      : tray.downMenu({ busy }, { openDashboard: showWindow, start: startLerd, quitApp })
     icon.setContextMenu(Menu.buildFromTemplate(template))
   }
 
@@ -327,7 +337,7 @@ if (!gotLock) {
     })
   })
 
-  // Shutdown, sign-out and the tray's Quit all pass here; let the window close.
+  // The tray's Quit Lerd Desktop passes here; let the window close.
   app.on('before-quit', () => {
     quitting = true
   })

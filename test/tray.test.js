@@ -34,8 +34,18 @@ function draw(opts = {}) {
 test('menuFromTray keeps lerd\'s order, separators and submenus', () => {
   const items = draw()
   assert.deepStrictEqual(items.map((i) => i.label || i.type),
-    ['Running', 'separator', 'Open Dashboard', 'Stop Lerd', 'Services (1/2)', 'Settings', 'Version v1.40.0'])
+    ['Running', 'separator', 'Open Dashboard', 'Stop Lerd', 'Services (1/2)', 'Settings', 'Version v1.40.0', 'Quit Lerd Desktop'])
   assert.deepStrictEqual(items[4].submenu.map((i) => i.label), ['mysql'])
+})
+
+test('menuFromTray ends with the app\'s own quit, which stays usable while lerd works', () => {
+  let quits = 0
+  const items = draw({ busy: tray.busyLabel('quit'), quitApp: () => quits++ })
+  const last = items[items.length - 1]
+  assert.strictEqual(last.label, 'Quit Lerd Desktop')
+  assert.notStrictEqual(last.enabled, false)
+  last.click()
+  assert.strictEqual(quits, 1)
 })
 
 test('menuFromTray gives each state its dot and leaves stated rows enabled', () => {
@@ -80,10 +90,10 @@ test('menuFromTray holds every action but the dashboard while one runs', () => {
 
 test('downMenu offers to start lerd, and holds it while it starts', () => {
   const called = []
-  const handlers = { openDashboard: () => called.push('open'), start: () => called.push('start'), quit: () => called.push('quit') }
+  const handlers = { openDashboard: () => called.push('open'), start: () => called.push('start'), quitApp: () => called.push('quit') }
   const items = tray.downMenu({}, handlers)
   assert.deepStrictEqual(items.map((i) => i.label || i.type),
-    ['Lerd is not running', 'separator', 'Open Dashboard', 'Start Lerd', 'separator', 'Quit'])
+    ['Lerd is not running', 'separator', 'Open Dashboard', 'Start Lerd', 'separator', 'Quit Lerd Desktop'])
   items[2].click()
   items[3].click()
   items[5].click()
