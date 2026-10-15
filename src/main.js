@@ -1,13 +1,22 @@
 'use strict'
 
 const path = require('node:path')
-const { app, BrowserWindow, Menu, shell, ipcMain, session, screen } = require('electron')
+const { execFile } = require('node:child_process')
+const os = require('node:os')
+const { app, BrowserWindow, Menu, Tray, nativeTheme, shell, ipcMain, session, screen } = require('electron')
 const { probe, dashboardURL } = require('./detect')
 const windowstate = require('./windowstate')
 const { navigation, isDashboard } = require('./navigation')
+const tray = require('./tray')
 
 const STATE_FILE = 'window-state.json'
 const SAVE_DELAY_MS = 400
+const TRAY_POLL_MS = 5000
+
+// On Windows the app lives in the tray: closing the window hides it so the
+// dashboard keeps delivering notifications, and it starts hidden at login.
+const IS_WINDOWS = process.platform === 'win32'
+const START_HIDDEN = process.argv.includes('--hidden')
 
 // grantDashboardPermissions lets the first-party lerd dashboard use notifications
 // (and the other permissions it asks for) without a prompt, so its "Allow
@@ -40,6 +49,7 @@ if (!process.env.FLATPAK_ID) {
 }
 
 let mainWindow = null
+let quitting = false
 
 // routeFromDeepLink turns lerd://open/<route> into the dashboard path/hash.
 function routeFromDeepLink(url) {
@@ -109,6 +119,7 @@ function createWindow() {
     minWidth: windowstate.MIN_WIDTH,
     minHeight: windowstate.MIN_HEIGHT,
     icon: path.join(__dirname, '..', 'assets', 'icon.png'),
+    show: !START_HIDDEN,
     backgroundColor: '#0b0f17',
     autoHideMenuBar: true,
     webPreferences: {
@@ -124,9 +135,13 @@ function createWindow() {
   mainWindow.on('move', scheduleSave)
   mainWindow.on('maximize', saveWindowState)
   mainWindow.on('unmaximize', saveWindowState)
-  mainWindow.on('close', () => {
+  mainWindow.on('close', (e) => {
     clearTimeout(saveTimer)
     saveWindowState()
+    if (IS_WINDOWS && !quitting) {
+      e.preventDefault()
+      mainWindow.hide()
+    }
   })
 
   // Keep the window titled "Lerd" rather than inheriting the dashboard's <title>.
@@ -162,6 +177,51 @@ async function showDashboardOrGate() {
   }
 }
 
+function showWindow() {
+  mainWindow.show()
+  mainWindow.focus()
+}
+
+// runLerd runs a lerd command through the Windows shim, which boots WSL if it
+// has to. It runs from the home folder: the app's own is System32, which WSL
+// would mount as the command's working directory.
+function runLerd(args, done) {
+  execFile(tray.lerdExePath(), args, { windowsHide: true, cwd: os.homedir() }, () => done())
+}
+
+function setupTray() {
+  const iconFor = (running) =>
+    path.join(__dirname, '..', 'assets', 'tray',
+      tray.trayIconFile({ running, darkTaskbar: nativeTheme.shouldUseDarkColorsForSystemIntegratedUI }))
+  const icon = new Tray(iconFor(null))
+  icon.setToolTip('Lerd')
+  icon.on('click', showWindow)
+  let busy = ''
+  let running = null
+  // The taskbar can turn light or dark on its own, apart from the apps.
+  nativeTheme.on('updated', () => icon.setImage(iconFor(running)))
+  const refresh = async () => {
+    running = await tray.fetchRunning()
+    icon.setImage(iconFor(running))
+    const run = (label, args) => () => {
+      busy = label
+      refresh()
+      runLerd(args, () => {
+        busy = ''
+        refresh()
+      })
+    }
+    icon.setContextMenu(Menu.buildFromTemplate(tray.menuTemplate({ running, busy }, {
+      open: showWindow,
+      start: run('Starting Lerd…', ['start']),
+      stop: run('Stopping Lerd…', ['stop']),
+      quit: () => app.quit(),
+    })))
+  }
+  refresh()
+  setInterval(refresh, TRAY_POLL_MS)
+}
+
 function wireIpc() {
   ipcMain.handle('lerd:probe', () => probe())
   ipcMain.handle('lerd:load-dashboard', () => mainWindow.loadURL(dashboardURL()))
@@ -194,6 +254,11 @@ if (!gotLock) {
     wireIpc()
     Menu.setApplicationMenu(null)
     createWindow()
+    if (IS_WINDOWS) {
+      setupTray()
+      // A dev run would register the bare electron.exe, without the app.
+      if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: true, args: ['--hidden'] })
+    }
     const coldDeepLink = firstDeepLink(process.argv)
     if (coldDeepLink) handleDeepLink(coldDeepLink)
     else showDashboardOrGate()
@@ -201,6 +266,11 @@ if (!gotLock) {
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
     })
+  })
+
+  // Shutdown, sign-out and the tray's Quit all pass here; let the window close.
+  app.on('before-quit', () => {
+    quitting = true
   })
 
   app.on('window-all-closed', () => {
