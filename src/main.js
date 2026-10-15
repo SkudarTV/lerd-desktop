@@ -16,9 +16,17 @@ const TRAY_POLL_MS = 30000
 const TRAY_HOVER_MS = 3000
 
 // On Windows the app lives in the tray: closing the window hides it so the
-// dashboard keeps delivering notifications, and it starts hidden at login.
+// dashboard keeps delivering notifications, and it starts hidden at login,
+// from the Run entry lerd's Windows installer writes.
 const IS_WINDOWS = process.platform === 'win32'
 const START_HIDDEN = process.argv.includes('--hidden')
+
+// The AppUserModelID lerd's own Windows toasts use. Sharing it gives the app's
+// notifications lerd's name and logo and a single "Lerd" entry in Windows'
+// notification settings. The installer registers it under
+// HKCU\Software\Classes\AppUserModelId, which is all Windows needs to show
+// them; no Start menu shortcut has to carry it.
+const WINDOWS_APP_ID = 'sh.lerd.Lerd'
 
 // grantDashboardPermissions lets the first-party lerd dashboard use notifications
 // (and the other permissions it asks for) without a prompt, so its "Allow
@@ -37,6 +45,7 @@ function grantDashboardPermissions() {
 // so KDE/Wayland matches the window to sh.lerd.Desktop.desktop and shows the
 // icon; in the dev run it reads "Lerd" for a clean taskbar label.
 app.setName(process.env.FLATPAK_ID || 'Lerd')
+if (IS_WINDOWS) app.setAppUserModelId(WINDOWS_APP_ID)
 
 // Chromium's Wayland color management lifts dark tones on KDE (#292c30 is drawn
 // as #2d3033), so the header no longer matches the window's own title bar.
@@ -308,11 +317,7 @@ if (!gotLock) {
     wireIpc()
     Menu.setApplicationMenu(null)
     createWindow()
-    if (IS_WINDOWS) {
-      setupTray()
-      // A dev run would register the bare electron.exe, without the app.
-      if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: true, args: ['--hidden'] })
-    }
+    if (IS_WINDOWS) setupTray()
     const coldDeepLink = firstDeepLink(process.argv)
     if (coldDeepLink) handleDeepLink(coldDeepLink)
     else showDashboardOrGate()
