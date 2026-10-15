@@ -9,6 +9,7 @@ const windowstate = require('./windowstate')
 const { navigation, isDashboard } = require('./navigation')
 const { protocolClient } = require('./protocol')
 const tray = require('./tray')
+const notifications = require('./notifications')
 
 const STATE_FILE = 'window-state.json'
 const SAVE_DELAY_MS = 400
@@ -214,11 +215,26 @@ function runLerd(args, done) {
   })
 }
 
-function notify({ title, body, silent }) {
+// A notification collected while it is still on screen, or in the action
+// centre, loses its click, so the latest few are held on to.
+const KEEP_NOTIFICATIONS = 20
+const shownNotifications = []
+
+function notify(options, onClick = showWindow) {
   if (!Notification.isSupported()) return
-  const n = new Notification({ title, body, silent, icon: path.join(__dirname, '..', 'assets', 'icon.png') })
-  n.on('click', showWindow)
+  const n = new Notification({ ...options, icon: path.join(__dirname, '..', 'assets', 'icon.png') })
+  n.on('click', onClick)
   n.show()
+  shownNotifications.push(n)
+  if (shownNotifications.length > KEEP_NOTIFICATIONS) shownNotifications.shift()
+}
+
+// listenForNotifications raises the notifications lerd-ui hands this app
+// rather than toasting them itself; a click opens their route here.
+function listenForNotifications() {
+  notifications.listen((n) => {
+    notify(notifications.notificationOptions(n), () => handleDeepLink(notifications.deepLink(n.route)))
+  })
 }
 
 // setupTray draws lerd's own tray menu. It reads the menu every TRAY_POLL_MS,
@@ -351,7 +367,10 @@ if (!gotLock) {
     wireIpc()
     Menu.setApplicationMenu(null)
     createWindow()
-    if (IS_WINDOWS) setupTray()
+    if (IS_WINDOWS) {
+      setupTray()
+      listenForNotifications()
+    }
     const coldDeepLink = firstDeepLink(process.argv)
     if (coldDeepLink) handleDeepLink(coldDeepLink)
     else showDashboardOrGate()
