@@ -3,65 +3,179 @@
 const test = require('node:test')
 const assert = require('node:assert')
 const http = require('node:http')
-const { menuTemplate, parseRunning, fetchRunning, lerdExePath, trayIconFile } = require('../src/tray')
+const tray = require('../src/tray')
 
 const noop = () => {}
-const actions = { open: noop, start: noop, stop: noop, quit: noop }
 
-test('parseRunning reads nginx.running out of /api/status', () => {
-  assert.strictEqual(parseRunning('{"nginx":{"running":true}}'), true)
-  assert.strictEqual(parseRunning('{"nginx":{"running":false}}'), false)
-  assert.strictEqual(parseRunning('not json'), null)
+// A menu shaped like the one lerd serves at /api/tray.
+const MENU = {
+  running: true,
+  high_contrast_icon: false,
+  items: [
+    { label: 'Running', state: 'running' },
+    { separator: true },
+    { label: 'Open Dashboard', action: 'dashboard', tooltip: 'Open the Lerd web dashboard' },
+    { label: 'Stop Lerd', action: 'stop' },
+    { label: 'Services (1/2)', items: [
+      { label: 'mysql', state: 'running', action: 'service stop mysql' },
+    ] },
+    { label: 'Settings', items: [
+      { label: 'Notifications', checked: true, action: 'notify off' },
+      { label: 'Managed service LAN access', checked: true, detail: 'Armed (LAN exposure off)', action: 'lan services off' },
+    ] },
+    { label: 'Version v1.40.0' },
+  ],
+}
+
+function draw(opts = {}) {
+  return tray.menuFromTray(MENU, { icon: (s) => `dot-${s}`, action: noop, openDashboard: noop, ...opts })
+}
+
+test('menuFromTray keeps lerd\'s order, separators and submenus', () => {
+  const items = draw()
+  assert.deepStrictEqual(items.map((i) => i.label || i.type),
+    ['Running', 'separator', 'Open Dashboard', 'Stop Lerd', 'Services (1/2)', 'Settings', 'Version v1.40.0'])
+  assert.deepStrictEqual(items[4].submenu.map((i) => i.label), ['mysql'])
 })
 
-test('menu offers Stop while lerd runs', () => {
-  const labels = menuTemplate({ running: true }, actions).map((i) => i.label)
-  assert.deepStrictEqual(labels, ['Lerd is running', undefined, 'Open Dashboard', 'Stop Lerd', undefined, 'Quit'])
+test('menuFromTray gives each state its dot and leaves stated rows enabled', () => {
+  const [status] = draw()
+  assert.strictEqual(status.icon, 'dot-running')
+  assert.notStrictEqual(status.enabled, false)
+  assert.strictEqual(status.click, undefined)
+  assert.strictEqual(draw()[4].submenu[0].icon, 'dot-running')
 })
 
-test('menu offers Start while lerd is stopped or unreachable', () => {
-  for (const running of [false, null]) {
-    const items = menuTemplate({ running }, actions)
-    assert.strictEqual(items[0].label, running === null ? 'Lerd is not reachable' : 'Lerd is stopped')
-    assert.strictEqual(items[3].label, 'Start Lerd')
-  }
+test('menuFromTray disables a plain row without an action', () => {
+  assert.strictEqual(draw()[6].enabled, false)
 })
 
-test('menu shows the command in flight and blocks a second one', () => {
-  const items = menuTemplate({ running: false, busy: 'Starting Lerd…' }, actions)
-  assert.strictEqual(items[0].label, 'Starting Lerd…')
-  assert.strictEqual(items[3].enabled, false)
+test('menuFromTray draws toggles as checkboxes and puts the detail in the label', () => {
+  const [notifications, lan] = draw()[5].submenu
+  assert.strictEqual(notifications.type, 'checkbox')
+  assert.strictEqual(notifications.checked, true)
+  assert.strictEqual(lan.label, 'Managed service LAN access: Armed (LAN exposure off)')
 })
 
-test('menu items call their actions', () => {
+test('menuFromTray posts actions but opens the dashboard itself', () => {
+  const posted = []
+  let opened = 0
+  const items = draw({ action: (a) => posted.push(a), openDashboard: () => opened++ })
+  items[2].click()
+  items[3].click()
+  items[4].submenu[0].click()
+  assert.strictEqual(opened, 1)
+  assert.deepStrictEqual(posted, ['stop', 'service stop mysql'])
+})
+
+test('menuFromTray holds every action but the dashboard while one runs', () => {
+  const items = draw({ busy: tray.busyLabel('stop') })
+  assert.deepStrictEqual(items[0], { label: 'lerd stop…', enabled: false })
+  // The busy row comes first, so lerd's items move down one.
+  assert.strictEqual(items[4].enabled, false)
+  assert.strictEqual(items[5].submenu[0].enabled, false)
+  assert.strictEqual(items[6].submenu[0].enabled, false)
+  assert.notStrictEqual(items[3].enabled, false)
+})
+
+test('downMenu offers to start lerd, and holds it while it starts', () => {
   const called = []
-  const spy = { open: () => called.push('open'), start: () => called.push('start'), stop: () => called.push('stop'), quit: () => called.push('quit') }
-  const items = menuTemplate({ running: true }, spy)
+  const handlers = { openDashboard: () => called.push('open'), start: () => called.push('start'), quit: () => called.push('quit') }
+  const items = tray.downMenu({}, handlers)
+  assert.deepStrictEqual(items.map((i) => i.label || i.type),
+    ['Lerd is not running', 'separator', 'Open Dashboard', 'Start Lerd', 'separator', 'Quit'])
   items[2].click()
   items[3].click()
   items[5].click()
-  assert.deepStrictEqual(called, ['open', 'stop', 'quit'])
+  assert.deepStrictEqual(called, ['open', 'start', 'quit'])
+  const busy = tray.downMenu({ busy: 'Starting Lerd…' }, handlers)
+  assert.strictEqual(busy[0].label, 'Starting Lerd…')
+  assert.strictEqual(busy[3].enabled, false)
 })
 
-test('fetchRunning asks the dashboard and never rejects', async () => {
+test('notification shows lerd\'s words, quietly on success', () => {
+  assert.deepStrictEqual(tray.notification({ status: 200, result: { ok: true, title: 'redis started' } }),
+    { title: 'redis started', body: '', silent: true })
+  assert.deepStrictEqual(tray.notification({ status: 200, result: { ok: false, title: "Couldn't start redis", body: 'port taken' } }),
+    { title: "Couldn't start redis", body: 'port taken', silent: false })
+})
+
+test('notification stays quiet when lerd has nothing to say or the menu moved', () => {
+  assert.strictEqual(tray.notification({ status: 200, result: { ok: true } }), null)
+  assert.strictEqual(tray.notification({ status: 409, result: null }), null)
+})
+
+test('notification says so when lerd could not be reached', () => {
+  assert.strictEqual(tray.notification({ status: 0, result: null }).silent, false)
+})
+
+test('fetchTray reads the menu and never rejects', async () => {
   const server = http.createServer((req, res) => {
-    assert.strictEqual(req.url, '/api/status')
+    assert.strictEqual(req.url, '/api/tray')
     res.writeHead(200, { 'content-type': 'application/json' })
-    res.end('{"nginx":{"running":true}}')
+    res.end(JSON.stringify(MENU))
   })
   await new Promise((r) => server.listen(0, '127.0.0.1', r))
-  assert.strictEqual(await fetchRunning({ port: server.address().port }), true)
+  assert.deepStrictEqual(await tray.fetchTray({ port: server.address().port }), MENU)
   server.close()
-  assert.strictEqual(await fetchRunning({ port: 1, timeoutMs: 500 }), null)
+  assert.strictEqual(await tray.fetchTray({ port: 1, timeoutMs: 500 }), null)
+})
+
+test('parseTray turns away a body without items', () => {
+  assert.strictEqual(tray.parseTray('{"running":true}'), null)
+  assert.strictEqual(tray.parseTray('not json'), null)
+})
+
+test('postAction sends the CSRF header and reads both kinds of answer', async () => {
+  const server = http.createServer((req, res) => {
+    let body = ''
+    req.on('data', (c) => (body += c))
+    req.on('end', () => {
+      assert.strictEqual(req.method, 'POST')
+      assert.strictEqual(req.url, '/api/tray/action')
+      assert.strictEqual(req.headers['x-lerd-csrf'], '1')
+      const { action } = JSON.parse(body)
+      if (action === 'stale') {
+        res.writeHead(409)
+        res.end('the tray menu has no action stale')
+        return
+      }
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ ok: true, title: `${action} done` }))
+    })
+  })
+  await new Promise((r) => server.listen(0, '127.0.0.1', r))
+  const port = server.address().port
+  assert.deepStrictEqual(await tray.postAction('stop', { port }), { status: 200, result: { ok: true, title: 'stop done' } })
+  assert.deepStrictEqual(await tray.postAction('stale', { port }), { status: 409, result: null })
+  server.close()
+  assert.deepStrictEqual(await tray.postAction('stop', { port: 1 }), { status: 0, result: null })
+})
+
+test('tray icon follows lerd-tray: red when down, green on request, mono otherwise', () => {
+  assert.strictEqual(tray.trayIconFile({ running: false, darkTaskbar: true }), 'stopped.png')
+  assert.strictEqual(tray.trayIconFile({ running: null, highContrast: true }), 'stopped.png')
+  assert.strictEqual(tray.trayIconFile({ running: true, highContrast: true, darkTaskbar: true }), 'running-green.png')
+  assert.strictEqual(tray.trayIconFile({ running: true, darkTaskbar: true }), 'running-white.png')
+  assert.strictEqual(tray.trayIconFile({ running: true, darkTaskbar: false }), 'running-dark.png')
+})
+
+test('dotFile knows lerd\'s four states', () => {
+  assert.strictEqual(tray.dotFile('warning'), require('node:path').join('dots', 'warning.png'))
+  assert.strictEqual(tray.dotFile('sparkly'), null)
+})
+
+test('lastLine picks the line lerd ended on', () => {
+  assert.strictEqual(tray.lastLine('Starting…\r\nError: podman is not running\r\n\r\n'), 'Error: podman is not running')
+  assert.strictEqual(tray.lastLine(''), '')
+})
+
+test('tooltip tells running, stopped and unreachable apart', () => {
+  assert.strictEqual(tray.tooltip({ running: true }), 'Lerd is running')
+  assert.strictEqual(tray.tooltip({ running: false }), 'Lerd is stopped')
+  assert.strictEqual(tray.tooltip(null), 'Lerd is not running')
 })
 
 test('lerdExePath points at the shim wsl:setup installs', () => {
-  assert.strictEqual(lerdExePath('C:\\Users\\me\\AppData\\Local'), 'C:\\Users\\me\\AppData\\Local\\lerd\\bin\\lerd.exe')
-})
-
-test('tray icon follows lerd-tray: red when stopped, mono against the taskbar when running', () => {
-  assert.strictEqual(trayIconFile({ running: false, darkTaskbar: true }), 'stopped.png')
-  assert.strictEqual(trayIconFile({ running: null, darkTaskbar: false }), 'stopped.png')
-  assert.strictEqual(trayIconFile({ running: true, darkTaskbar: true }), 'running-white.png')
-  assert.strictEqual(trayIconFile({ running: true, darkTaskbar: false }), 'running-dark.png')
+  assert.strictEqual(tray.lerdExePath('C:\\Users\\me\\AppData\\Local'), 'C:\\Users\\me\\AppData\\Local\\lerd\\bin\\lerd.exe')
 })

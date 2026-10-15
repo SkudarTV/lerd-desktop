@@ -3,7 +3,7 @@
 const path = require('node:path')
 const { execFile } = require('node:child_process')
 const os = require('node:os')
-const { app, BrowserWindow, Menu, Tray, nativeTheme, shell, ipcMain, session, screen } = require('electron')
+const { app, BrowserWindow, Menu, Notification, Tray, nativeTheme, shell, ipcMain, session, screen } = require('electron')
 const { probe, dashboardURL } = require('./detect')
 const windowstate = require('./windowstate')
 const { navigation, isDashboard } = require('./navigation')
@@ -11,7 +11,9 @@ const tray = require('./tray')
 
 const STATE_FILE = 'window-state.json'
 const SAVE_DELAY_MS = 400
-const TRAY_POLL_MS = 5000
+const TRAY_POLL_MS = 30000
+// Pointing at the tray refreshes the menu, at most this often.
+const TRAY_HOVER_MS = 3000
 
 // On Windows the app lives in the tray: closing the window hides it so the
 // dashboard keeps delivering notifications, and it starts hidden at login.
@@ -184,40 +186,92 @@ function showWindow() {
 
 // runLerd runs a lerd command through the Windows shim, which boots WSL if it
 // has to. It runs from the home folder: the app's own is System32, which WSL
-// would mount as the command's working directory.
+// would mount as the command's working directory. done gets lerd's last line
+// of output when it fails.
 function runLerd(args, done) {
-  execFile(tray.lerdExePath(), args, { windowsHide: true, cwd: os.homedir() }, () => done())
+  execFile(tray.lerdExePath(), args, { windowsHide: true, cwd: os.homedir() }, (err, stdout, stderr) => {
+    done(err ? tray.lastLine(stderr) || tray.lastLine(stdout) || err.message : null)
+  })
 }
 
+function notify({ title, body, silent }) {
+  if (!Notification.isSupported()) return
+  new Notification({ title, body, silent, icon: path.join(__dirname, '..', 'assets', 'icon.png') }).show()
+}
+
+// setupTray draws lerd's own tray menu. It reads the menu every TRAY_POLL_MS,
+// when the pointer reaches the icon and right after each action.
 function setupTray() {
-  const iconFor = (running) =>
-    path.join(__dirname, '..', 'assets', 'tray',
-      tray.trayIconFile({ running, darkTaskbar: nativeTheme.shouldUseDarkColorsForSystemIntegratedUI }))
-  const icon = new Tray(iconFor(null))
-  icon.setToolTip('Lerd')
-  icon.on('click', showWindow)
+  const trayDir = path.join(__dirname, '..', 'assets', 'tray')
+  let menu = null
   let busy = ''
-  let running = null
-  // The taskbar can turn light or dark on its own, apart from the apps.
-  nativeTheme.on('updated', () => icon.setImage(iconFor(running)))
-  const refresh = async () => {
-    running = await tray.fetchRunning()
-    icon.setImage(iconFor(running))
-    const run = (label, args) => () => {
-      busy = label
-      refresh()
-      runLerd(args, () => {
-        busy = ''
-        refresh()
+  let lastRead = 0
+
+  const iconFile = () => path.join(trayDir, tray.trayIconFile({
+    running: menu ? menu.running : null,
+    highContrast: menu ? menu.high_contrast_icon : false,
+    darkTaskbar: nativeTheme.shouldUseDarkColorsForSystemIntegratedUI,
+  }))
+  const icon = new Tray(iconFile())
+  icon.on('click', showWindow)
+
+  const draw = () => {
+    icon.setImage(iconFile())
+    icon.setToolTip(tray.tooltip(menu))
+    const template = menu
+      ? tray.menuFromTray(menu, {
+        busy,
+        icon: (state) => {
+          const file = tray.dotFile(state)
+          return file ? path.join(trayDir, file) : undefined
+        },
+        action: runAction,
+        openDashboard: showWindow,
       })
-    }
-    icon.setContextMenu(Menu.buildFromTemplate(tray.menuTemplate({ running, busy }, {
-      open: showWindow,
-      start: run('Starting Lerd…', ['start']),
-      stop: run('Stopping Lerd…', ['stop']),
-      quit: () => app.quit(),
-    })))
+      : tray.downMenu({ busy }, { openDashboard: showWindow, start: startLerd, quit: () => app.quit() })
+    icon.setContextMenu(Menu.buildFromTemplate(template))
   }
+
+  // Polls can overlap a slow one; only the latest read is drawn.
+  let reads = 0
+  const refresh = async () => {
+    const n = ++reads
+    lastRead = Date.now()
+    const read = await tray.fetchTray()
+    if (n !== reads) return
+    menu = read
+    draw()
+  }
+
+  const runAction = async (action) => {
+    if (busy) return
+    busy = tray.busyLabel(action)
+    draw()
+    const res = await tray.postAction(action)
+    busy = ''
+    // A 409 means the menu changed under the click: the refresh redraws it.
+    const note = tray.notification(res)
+    if (note) notify(note)
+    refresh()
+  }
+
+  const startLerd = () => {
+    if (busy) return
+    busy = 'Starting Lerd…'
+    draw()
+    runLerd(['start'], (failure) => {
+      busy = ''
+      if (failure) notify({ title: "Couldn't start Lerd", body: failure, silent: false })
+      refresh()
+    })
+  }
+
+  // The taskbar can turn light or dark on its own, apart from the apps.
+  nativeTheme.on('updated', draw)
+  icon.on('mouse-enter', () => {
+    if (Date.now() - lastRead > TRAY_HOVER_MS) refresh()
+  })
+  draw()
   refresh()
   setInterval(refresh, TRAY_POLL_MS)
 }
