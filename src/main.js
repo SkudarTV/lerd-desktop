@@ -220,6 +220,8 @@ function setupTray() {
   const trayDir = path.join(__dirname, '..', 'assets', 'tray')
   let menu = null
   let busy = ''
+  // Set from a Quit Lerd lerd took until lerd stops answering.
+  let lerdQuitting = false
   let lastRead = 0
 
   const iconFile = () => path.join(trayDir, tray.trayIconFile({
@@ -258,6 +260,9 @@ function setupTray() {
     lastRead = Date.now()
     const read = await tray.fetchTray()
     if (n !== reads) return
+    // While lerd quits its API still serves the old menu; the tray already
+    // shows it gone.
+    if (lerdQuitting && read) return
     menu = read
     draw()
   }
@@ -267,7 +272,15 @@ function setupTray() {
     busy = tray.busyLabel(action)
     draw()
     const res = await tray.postAction(action)
-    if (tray.quitAccepted(action, res)) await tray.waitUntilDown()
+    if (tray.quitAccepted(action, res)) {
+      // Lerd answers before it stops, which takes seconds: show it gone at
+      // once, holding Start Lerd until it really is.
+      menu = null
+      lerdQuitting = true
+      draw()
+      await tray.waitUntilDown()
+      lerdQuitting = false
+    }
     busy = ''
     // A 409 means the menu changed under the click: the refresh redraws it.
     const note = tray.notification(res)
