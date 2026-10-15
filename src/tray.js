@@ -91,15 +91,26 @@ function quitAccepted(action, { status, result }) {
   return action === QUIT && status === 200 && !!result && result.ok === true
 }
 
-// waitUntilDown polls the menu until lerd stops answering, so the tray only
-// redraws once lerd is gone. It resolves whether lerd went down in time.
-async function waitUntilDown({ timeoutMs = 60000, intervalMs = 1000, fetch = fetchTray } = {}) {
+// waitUntil polls the menu until lerd answers (up) or stops answering, so the
+// tray redraws once lerd has really started or gone rather than at the next
+// poll. It resolves whether lerd got there in time.
+async function waitUntil(up, { timeoutMs = 60000, intervalMs = 1000, fetch = fetchTray } = {}) {
   const until = Date.now() + timeoutMs
   while (Date.now() < until) {
-    if (!(await fetch())) return true
+    if (!!(await fetch()) === up) return true
     await new Promise((r) => setTimeout(r, intervalMs))
   }
   return false
+}
+
+const waitUntilDown = (opts) => waitUntil(false, opts)
+const waitUntilUp = (opts) => waitUntil(true, opts)
+
+// startNotification tells how starting lerd through the shim went, in the
+// words lerd's own Start Lerd uses. failure is lerd's last line, or null.
+function startNotification(failure) {
+  if (failure) return { title: "Couldn't start Lerd", body: failure, silent: false }
+  return { title: 'Lerd started', body: '', silent: true }
 }
 
 // menuFromTray turns lerd's menu into an Electron menu template. icon maps a
@@ -207,6 +218,8 @@ module.exports = {
   busyLabel,
   quitAccepted,
   waitUntilDown,
+  waitUntilUp,
+  startNotification,
   menuFromTray,
   downMenu,
   notification,

@@ -292,9 +292,12 @@ function setupTray() {
     if (busy) return
     busy = tray.busyLabel('start')
     draw()
-    runLerd(['start'], (failure) => {
+    runLerd(['start'], async (failure) => {
+      // The shim can return before lerd's API answers; wait for it so the
+      // menu turns over at once rather than at the next poll.
+      if (!failure) await tray.waitUntilUp()
       busy = ''
-      if (failure) notify({ title: "Couldn't start Lerd", body: failure, silent: false })
+      notify(tray.startNotification(failure))
       refresh()
     })
   }

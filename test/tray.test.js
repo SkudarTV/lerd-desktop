@@ -109,6 +109,19 @@ test('waitUntilDown waits for lerd to stop answering, and gives up in time', asy
   assert.strictEqual(await tray.waitUntilDown({ fetch: async () => MENU, intervalMs: 5, timeoutMs: 20 }), false)
 })
 
+test('waitUntilUp waits for lerd to answer', async () => {
+  let reads = 0
+  const comesUp = async () => (++reads < 3 ? null : MENU)
+  assert.strictEqual(await tray.waitUntilUp({ fetch: comesUp, intervalMs: 1 }), true)
+  assert.strictEqual(reads, 3)
+})
+
+test('startNotification says lerd started, quietly, or why it did not', () => {
+  assert.deepStrictEqual(tray.startNotification(null), { title: 'Lerd started', body: '', silent: true })
+  assert.deepStrictEqual(tray.startNotification('podman is not running'),
+    { title: "Couldn't start Lerd", body: 'podman is not running', silent: false })
+})
+
 test('downMenu offers to start lerd, and holds it while it starts', () => {
   const called = []
   const handlers = { openDashboard: () => called.push('open'), start: () => called.push('start'), quitApp: () => called.push('quit') }
