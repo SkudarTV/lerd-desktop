@@ -74,9 +74,32 @@ function postAction(action, { host = DEFAULT_HOST, port = DEFAULT_PORT } = {}) {
 // would open another one over lerd://.
 const DASHBOARD = 'dashboard'
 
-// busyLabel names the action in flight. Action ids are lerd's own arguments.
+const QUIT = 'quit'
+
+const BUSY_LABELS = { start: 'Starting Lerd…', stop: 'Stopping Lerd…', [QUIT]: 'Quitting Lerd…' }
+
+// busyLabel names the action in flight. Other action ids are lerd's own
+// arguments.
 function busyLabel(action) {
-  return `lerd ${action}…`
+  return BUSY_LABELS[action] || `lerd ${action}…`
+}
+
+// quitAccepted tells whether lerd took a Quit Lerd. Lerd answers before it
+// stops, and its API, which goes down with it, keeps serving the old menu for
+// the seconds that takes.
+function quitAccepted(action, { status, result }) {
+  return action === QUIT && status === 200 && !!result && result.ok === true
+}
+
+// waitUntilDown polls the menu until lerd stops answering, so the tray only
+// redraws once lerd is gone. It resolves whether lerd went down in time.
+async function waitUntilDown({ timeoutMs = 60000, intervalMs = 1000, fetch = fetchTray } = {}) {
+  const until = Date.now() + timeoutMs
+  while (Date.now() < until) {
+    if (!(await fetch())) return true
+    await new Promise((r) => setTimeout(r, intervalMs))
+  }
+  return false
 }
 
 // menuFromTray turns lerd's menu into an Electron menu template. icon maps a
@@ -182,6 +205,8 @@ module.exports = {
   parseTray,
   postAction,
   busyLabel,
+  quitAccepted,
+  waitUntilDown,
   menuFromTray,
   downMenu,
   notification,

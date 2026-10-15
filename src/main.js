@@ -267,6 +267,7 @@ function setupTray() {
     busy = tray.busyLabel(action)
     draw()
     const res = await tray.postAction(action)
+    if (tray.quitAccepted(action, res)) await tray.waitUntilDown()
     busy = ''
     // A 409 means the menu changed under the click: the refresh redraws it.
     const note = tray.notification(res)
@@ -276,7 +277,7 @@ function setupTray() {
 
   const startLerd = () => {
     if (busy) return
-    busy = 'Starting Lerd…'
+    busy = tray.busyLabel('start')
     draw()
     runLerd(['start'], (failure) => {
       busy = ''

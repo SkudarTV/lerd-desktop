@@ -80,12 +80,33 @@ test('menuFromTray posts actions but opens the dashboard itself', () => {
 
 test('menuFromTray holds every action but the dashboard while one runs', () => {
   const items = draw({ busy: tray.busyLabel('stop') })
-  assert.deepStrictEqual(items[0], { label: 'lerd stop…', enabled: false })
+  assert.deepStrictEqual(items[0], { label: 'Stopping Lerd…', enabled: false })
   // The busy row comes first, so lerd's items move down one.
   assert.strictEqual(items[4].enabled, false)
   assert.strictEqual(items[5].submenu[0].enabled, false)
   assert.strictEqual(items[6].submenu[0].enabled, false)
   assert.notStrictEqual(items[3].enabled, false)
+})
+
+test('busyLabel words lerd\'s lifecycle and falls back to the action id', () => {
+  assert.strictEqual(tray.busyLabel('quit'), 'Quitting Lerd…')
+  assert.strictEqual(tray.busyLabel('service stop redis'), 'lerd service stop redis…')
+})
+
+test('quitAccepted only follows a Quit Lerd that lerd took', () => {
+  const ok = { status: 200, result: { ok: true, title: 'Lerd stopped' } }
+  assert.strictEqual(tray.quitAccepted('quit', ok), true)
+  assert.strictEqual(tray.quitAccepted('stop', ok), false)
+  assert.strictEqual(tray.quitAccepted('quit', { status: 409, result: null }), false)
+  assert.strictEqual(tray.quitAccepted('quit', { status: 200, result: { ok: false } }), false)
+})
+
+test('waitUntilDown waits for lerd to stop answering, and gives up in time', async () => {
+  let reads = 0
+  const goesDown = async () => (++reads < 3 ? MENU : null)
+  assert.strictEqual(await tray.waitUntilDown({ fetch: goesDown, intervalMs: 1 }), true)
+  assert.strictEqual(reads, 3)
+  assert.strictEqual(await tray.waitUntilDown({ fetch: async () => MENU, intervalMs: 5, timeoutMs: 20 }), false)
 })
 
 test('downMenu offers to start lerd, and holds it while it starts', () => {
