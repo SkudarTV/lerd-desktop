@@ -1,7 +1,7 @@
 'use strict'
 
 const path = require('node:path')
-const { execFile } = require('node:child_process')
+const { execFile, spawn } = require('node:child_process')
 const os = require('node:os')
 const fs = require('node:fs')
 const { app, BrowserWindow, Menu, Notification, Tray, nativeTheme, shell, ipcMain, session, screen } = require('electron')
@@ -11,6 +11,7 @@ const { navigation, isDashboard } = require('./navigation')
 const { protocolClient } = require('./protocol')
 const tray = require('./tray')
 const notifications = require('./notifications')
+const agent = require('./agent')
 
 const STATE_FILE = 'window-state.json'
 const SAVE_DELAY_MS = 400
@@ -234,6 +235,17 @@ function notify(options, onClick = showWindow) {
   if (shownNotifications.length > KEEP_NOTIFICATIONS) shownNotifications.shift()
 }
 
+// startAgent keeps lerd's Windows agent running: DNS for the sites and the
+// distro booted at login. windowsHide gives it a console with no window, which
+// the wsl.exe it starts shares rather than opening one of their own.
+function startAgent() {
+  agent.superviseAgent({
+    command: () => agent.agentCommand({ exists: fs.existsSync }),
+    spawn: (file, args) => spawn(file, args, { windowsHide: true, stdio: 'ignore', cwd: os.homedir() }),
+    log: (msg) => console.log(`[agent] ${msg}`),
+  })
+}
+
 // listenForNotifications raises the notifications lerd-ui hands this app
 // rather than toasting them itself; a click opens their route here.
 function listenForNotifications() {
@@ -375,6 +387,7 @@ if (!gotLock) {
     if (IS_WINDOWS) {
       setupTray()
       listenForNotifications()
+      startAgent()
     }
     const coldDeepLink = firstDeepLink(process.argv)
     if (coldDeepLink) handleDeepLink(coldDeepLink)
