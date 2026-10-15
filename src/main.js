@@ -7,6 +7,7 @@ const { app, BrowserWindow, Menu, Notification, Tray, nativeTheme, shell, ipcMai
 const { probe, dashboardURL } = require('./detect')
 const windowstate = require('./windowstate')
 const { navigation, isDashboard } = require('./navigation')
+const { protocolClient } = require('./protocol')
 const tray = require('./tray')
 
 const STATE_FILE = 'window-state.json'
@@ -53,12 +54,16 @@ if (IS_WINDOWS) app.setAppUserModelId(WINDOWS_APP_ID)
 app.commandLine.appendSwitch('disable-features', 'WaylandWpColorManagerV1')
 
 // Claim the lerd:// scheme so clicking a native notification from the daemon
-// focuses this window at the right route. Under Flatpak the manifest's desktop
-// entry already registers it, and the host tool this shells out to (xdg-settings)
-// isn't in the sandbox, so skip it there.
-if (!process.env.FLATPAK_ID) {
-  app.setAsDefaultProtocolClient('lerd')
-}
+// focuses this window at the right route; protocolClient says when someone
+// else registers it instead.
+const lerdScheme = protocolClient({
+  platform: process.platform,
+  flatpak: !!process.env.FLATPAK_ID,
+  isPackaged: app.isPackaged,
+  execPath: process.execPath,
+  appPath: app.getAppPath(),
+})
+if (lerdScheme) app.setAsDefaultProtocolClient(...lerdScheme)
 
 let mainWindow = null
 let quitting = false
@@ -211,7 +216,9 @@ function runLerd(args, done) {
 
 function notify({ title, body, silent }) {
   if (!Notification.isSupported()) return
-  new Notification({ title, body, silent, icon: path.join(__dirname, '..', 'assets', 'icon.png') }).show()
+  const n = new Notification({ title, body, silent, icon: path.join(__dirname, '..', 'assets', 'icon.png') })
+  n.on('click', showWindow)
+  n.show()
 }
 
 // setupTray draws lerd's own tray menu. It reads the menu every TRAY_POLL_MS,
