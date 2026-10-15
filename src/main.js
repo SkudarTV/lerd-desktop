@@ -3,6 +3,7 @@
 const path = require('node:path')
 const { execFile } = require('node:child_process')
 const os = require('node:os')
+const fs = require('node:fs')
 const { app, BrowserWindow, Menu, Notification, Tray, nativeTheme, shell, ipcMain, session, screen } = require('electron')
 const { probe, dashboardURL } = require('./detect')
 const windowstate = require('./windowstate')
@@ -205,12 +206,16 @@ function showWindow() {
   mainWindow.focus()
 }
 
-// runLerd runs a lerd command through the Windows shim, which boots WSL if it
-// has to. It runs from the home folder: the app's own is System32, which WSL
-// would mount as the command's working directory. done gets lerd's last line
-// of output when it fails.
+// runLerd runs a lerd command inside the distro, through the Windows shim or,
+// without it, wsl.exe; either boots WSL if it has to. It runs from the home
+// folder: the app's own is System32, which WSL would mount as the command's
+// working directory. done gets lerd's last line of output when it fails.
 function runLerd(args, done) {
-  execFile(tray.lerdExePath(), args, { windowsHide: true, cwd: os.homedir() }, (err, stdout, stderr) => {
+  const cmd = tray.lerdCommand(args, { exists: fs.existsSync, read: (f) => fs.readFileSync(f, 'utf8') })
+  if (!cmd) return done('Lerd is not set up on Windows. Run lerd wsl:setup inside WSL.')
+  // wsl.exe writes its own errors in UTF-16 unless asked for UTF-8.
+  const env = { ...process.env, WSL_UTF8: '1' }
+  execFile(cmd.file, cmd.args, { windowsHide: true, cwd: os.homedir(), env }, (err, stdout, stderr) => {
     done(err ? tray.lastLine(stderr) || tray.lastLine(stdout) || err.message : null)
   })
 }

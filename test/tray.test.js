@@ -220,6 +220,42 @@ test('tooltip tells running, stopped and unreachable apart', () => {
   assert.strictEqual(tray.tooltip(null), 'Lerd is not running')
 })
 
+test('parseWslConf reads the distro and lerd\'s path', () => {
+  assert.deepStrictEqual(tray.parseWslConf('distro=Ubuntu-24.04\r\nlerd=/home/me/.local/bin/lerd\r\ntld=test\r\n'),
+    { distro: 'Ubuntu-24.04', lerd: '/home/me/.local/bin/lerd' })
+  assert.strictEqual(tray.parseWslConf('tld=test\n'), null)
+})
+
+const WIN = { localAppData: 'C:\\Users\\me\\AppData\\Local', programFiles: 'C:\\Program Files', systemRoot: 'C:\\Windows' }
+const CONF = 'distro=Ubuntu-24.04\nlerd=/home/me/.local/bin/lerd\n'
+const files = (present) => ({
+  exists: (f) => f in present,
+  read: (f) => {
+    if (!(f in present)) throw new Error('ENOENT')
+    return present[f]
+  },
+})
+
+test('lerdCommand runs lerd through the shim when it is there', () => {
+  const shim = 'C:\\Users\\me\\AppData\\Local\\lerd\\bin\\lerd.exe'
+  assert.deepStrictEqual(tray.lerdCommand(['start'], { ...WIN, ...files({ [shim]: '' }) }), { file: shim, args: ['start'] })
+})
+
+test('lerdCommand falls back to wsl.exe when the shim is gone', () => {
+  const conf = 'C:\\Users\\me\\AppData\\Local\\lerd\\bin\\lerd-wsl.conf'
+  const wsl = 'C:\\Program Files\\WSL\\wsl.exe'
+  assert.deepStrictEqual(tray.lerdCommand(['start'], { ...WIN, ...files({ [conf]: CONF, [wsl]: '' }) }), {
+    file: wsl,
+    args: ['-d', 'Ubuntu-24.04', '--cd', '~', '--exec', '/home/me/.local/bin/lerd', 'start'],
+  })
+  assert.strictEqual(tray.lerdCommand(['start'], { ...WIN, ...files({ [conf]: CONF }) }).file,
+    'C:\\Windows\\System32\\wsl.exe', 'System32\'s wsl.exe when the WSL package is not where it installs')
+})
+
+test('lerdCommand gives up when lerd was never set up on Windows', () => {
+  assert.strictEqual(tray.lerdCommand(['start'], { ...WIN, ...files({}) }), null)
+})
+
 test('lerdExePath points at the shim wsl:setup installs', () => {
   assert.strictEqual(tray.lerdExePath('C:\\Users\\me\\AppData\\Local'), 'C:\\Users\\me\\AppData\\Local\\lerd\\bin\\lerd.exe')
 })

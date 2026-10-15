@@ -210,6 +210,46 @@ function lerdExePath(localAppData = process.env.LOCALAPPDATA || '') {
   return path.win32.join(localAppData, 'lerd', 'bin', 'lerd.exe')
 }
 
+// parseWslConf reads lerd-wsl.conf, which wsl:setup writes beside the shim:
+// key=value lines naming the distro and lerd's path inside it.
+function parseWslConf(text) {
+  const conf = {}
+  for (const line of String(text || '').split(/\r?\n/)) {
+    const i = line.indexOf('=')
+    if (i > 0) conf[line.slice(0, i).trim()] = line.slice(i + 1).trim()
+  }
+  return conf.distro && conf.lerd ? { distro: conf.distro, lerd: conf.lerd } : null
+}
+
+// lerdCommand is how to run lerd with args from Windows: through the shim
+// when it is there, and otherwise straight through wsl.exe with what
+// lerd-wsl.conf says, the way the shim itself does. Antivirus has been seen to
+// quarantine the unsigned shim and leave its config, and the tray's Start Lerd
+// must still work then. Starting any command boots WSL on the way. It returns
+// null when lerd was never set up on Windows. exists and read stand in for the
+// file system.
+function lerdCommand(args, {
+  localAppData = process.env.LOCALAPPDATA || '',
+  programFiles = process.env.ProgramFiles || 'C:\\Program Files',
+  systemRoot = process.env.SystemRoot || 'C:\\Windows',
+  exists,
+  read,
+}) {
+  const shim = lerdExePath(localAppData)
+  if (exists(shim)) return { file: shim, args }
+  let conf = null
+  try {
+    conf = parseWslConf(read(path.win32.join(localAppData, 'lerd', 'bin', 'lerd-wsl.conf')))
+  } catch {
+    return null
+  }
+  if (!conf) return null
+  // The WSL package's own wsl.exe; System32's is a stub until it is installed.
+  const packaged = path.win32.join(programFiles, 'WSL', 'wsl.exe')
+  const wsl = exists(packaged) ? packaged : path.win32.join(systemRoot, 'System32', 'wsl.exe')
+  return { file: wsl, args: ['-d', conf.distro, '--cd', '~', '--exec', conf.lerd, ...args] }
+}
+
 module.exports = {
   DASHBOARD,
   fetchTray,
@@ -228,4 +268,6 @@ module.exports = {
   lastLine,
   tooltip,
   lerdExePath,
+  parseWslConf,
+  lerdCommand,
 }
