@@ -73,6 +73,9 @@ flatpak install --user https://lerd.sh/lerd.flatpakref
 Then launch **Lerd** from your app menu, or run `lerd dashboard` — when the app is
 installed it opens there instead of the browser. Coming soon to Flathub.
 
+On Windows, `Install-Lerd.exe` from the latest release sets up WSL, Ubuntu, Lerd
+and this app in one wizard; see [installer/](installer/README.md).
+
 ### The window never shows up on Wayland
 
 Some hybrid Intel and NVIDIA laptops crash under a Wayland session before the

@@ -40,7 +40,7 @@ LicenseFile=assets\LICENSE.txt
 UninstallDisplayIcon={app}\lerd.ico
 UninstallDisplayName=Lerd
 OutputDir=dist
-OutputBaseFilename=lerd-setup
+OutputBaseFilename=Install-Lerd
 Compression=lzma2
 SolidCompression=yes
 SetupLogging=yes
@@ -691,7 +691,7 @@ begin
     Exit;
   end;
   { The downloaded Setup may not be where it was after the restart. }
-  Resume := ExpandConstant('{commonappdata}\Lerd\lerd-setup.exe');
+  Resume := ExpandConstant('{commonappdata}\Lerd\Install-Lerd.exe');
   ForceDirectories(ExtractFileDir(Resume));
   if not CopyFile(ExpandConstant('{srcexe}'), Resume, False) then
     Resume := ExpandConstant('{srcexe}');

@@ -6,7 +6,7 @@
 
 <p align="center">
   The one-click installer that brings <a href="https://lerd.sh">Lerd</a> to Windows.<br>
-  Download <code>lerd-setup.exe</code>, click through a wizard, and get the whole local PHP stack, no terminal required.
+  Download <code>Install-Lerd.exe</code>, click through a wizard, and get the whole local PHP stack, no terminal required.
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@
   <a href="https://lerd.sh/getting-started/wsl2"><img src="https://img.shields.io/badge/docs-lerd.sh-blue" alt="Docs"></a>
   <img src="https://img.shields.io/badge/Windows-10%202004%2B%20%C2%B7%2011-0078d4" alt="Windows 10 2004+ and 11">
   <img src="https://img.shields.io/badge/arch-x64%20%C2%B7%20Arm64-lightgrey" alt="x64 and Arm64">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="../LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
 </p>
 
 Lerd runs Nginx, PHP-FPM and every service as rootless containers, with a dashboard, a TUI, a CLI and an MCP server for your AI assistant. On Windows that stack lives inside WSL2, and getting there by hand means switching on Windows features, rebooting, installing a distro, enabling systemd, wiring up networking and DNS, and trusting a certificate. **This installer does all of it for you.**
@@ -34,13 +34,13 @@ That's the whole point: **Lerd on Windows should feel like any other Windows app
 
 ## Install
 
-Download `lerd-setup.exe` from the [latest release](https://github.com/lerd-env/windows-installer/releases) and run it. You need Windows 10 version 2004 (build 19041) or newer, or Windows 11, on x64 or Arm64.
+Download `Install-Lerd.exe` from the [latest release](https://github.com/lerd-env/lerd-desktop/releases/latest) of the Lerd desktop app and run it. You need Windows 10 version 2004 (build 19041) or newer, or Windows 11, on x64 or Arm64.
 
-> The installer is in beta, like Lerd's Windows support, and no release has been tagged yet. Until the first one is, every push to `main` builds `lerd-setup.exe` as an artifact on the [Actions tab](https://github.com/lerd-env/windows-installer/actions). Prefer doing it by hand? The [WSL2 guide](https://lerd.sh/getting-started/wsl2) covers every step.
+> The installer is in beta, like Lerd's Windows support. Every push to `main` also builds `Install-Lerd.exe` as an artifact on the [Actions tab](https://github.com/lerd-env/lerd-desktop/actions/workflows/windows.yml). Prefer doing it by hand? The [WSL2 guide](https://lerd.sh/getting-started/wsl2) covers every step.
 
 ## How it works
 
-The installer is a bootstrapper, the native-wizard counterpart of `lerd.exe --setup` (`cmd/lerd-windows/setup.go`). It prepares Windows and hands Lerd itself to `install.sh`. It has a version of its own, which moves only when the installer changes and says nothing about Lerd's.
+The installer is a bootstrapper, the native-wizard counterpart of `lerd.exe --setup` (`cmd/lerd-windows/setup.go`). It prepares Windows and hands Lerd itself to `install.sh`. It ships with the desktop app and carries the app's version.
 
 1. **WSL features.** Enables `Microsoft-Windows-Subsystem-Linux` and `VirtualMachinePlatform` and offers the restart they need. Setup registers itself in `RunOnce` and resumes after you sign back in with the same account.
 2. **WSL.** Installs the latest MSI from github.com/microsoft/WSL. Setup only ever runs the real `wsl.exe` in `C:\Program Files\WSL`; the System32 stub opens its own window offering to install WSL.
@@ -65,7 +65,7 @@ Uninstalling asks whether to keep the distro, which runs `lerd uninstall --keep-
 
 ```powershell
 winget install JRSoftware.InnoSetup
-.\build.ps1                      # -> dist\lerd-setup.exe
+.\build.ps1                      # -> dist\Install-Lerd.exe
 .\build.ps1 -Version 0.2.0       # overrides the version in lerd.iss
 ```
 
@@ -76,7 +76,7 @@ winget install JRSoftware.InnoSetup
 `/local=<folder>` (or the `LERD_SETUP_LOCAL` environment variable) installs Lerd from a Windows folder holding `install.sh`, `lerd` and `lerd.exe` instead of the latest release. `make build` in lerd-wsl leaves `lerd` and `lerd.exe` in `build\`; copy `install.sh` beside them:
 
 ```powershell
-dist\lerd-setup.exe /local=C:\path\to\lerd-wsl\build
+dist\Install-Lerd.exe /local=C:\path\to\lerd-wsl\build
 ```
 
 The same folder can hold an unreleased desktop app: `npm run package:win` in lerd-desktop leaves `lerd-desktop-win32-x64.zip` (and the arm64 one) in its `dist\`; copy the one for the machine beside the rest. Setup takes the app from there when it is present, and from the latest lerd-desktop release otherwise.
@@ -85,9 +85,7 @@ The same folder can hold an unreleased desktop app: `npm run package:win` in ler
 
 ### Versions and releases
 
-The version lives in `lerd.iss` (`AppVersion`). It stays on 0.x until the installer is stable. The wizard shows just "Lerd", so a 0.x number is never mistaken for Lerd's own version; Add/Remove Programs lists it as the version of the installed package.
-
-`.github/workflows/build.yml` builds `lerd-setup.exe` on every push to `main` and every pull request and keeps it as a run artifact. Pushing a `v*` tag also publishes it as a GitHub release, marked as a prerelease while on `v0.*`.
+The installer takes the desktop app's version from `package.json`, so a release names one thing. `.github/workflows/windows.yml` builds it after packaging the app on every push to `main` and every pull request and keeps it as a run artifact, and a published release gets `Install-Lerd.exe` beside the app's zips.
 
 ### When this needs updating
 
@@ -106,4 +104,4 @@ The installer only changes when one of the things it relies on does:
 
 ## License
 
-MIT
+MIT, see [LICENSE](../LICENSE).

@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Builds lerd-setup.exe, the Inno Setup installer for lerd on Windows (WSL2).
+  Builds Install-Lerd.exe, the Inno Setup installer for lerd on Windows (WSL2).
 
 .PARAMETER Version
   The installer's own version, not lerd's. Defaults to the one in lerd.iss.
