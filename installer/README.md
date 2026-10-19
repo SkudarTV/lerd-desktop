@@ -57,7 +57,7 @@ Every Linux command runs under `setsid -w ... </dev/null`: Setup's hidden consol
 
 The full log is in `%TEMP%\Setup Log *.txt`. Silent installs are not supported, since the Linux user's password comes from the wizard.
 
-Uninstalling asks whether to keep the distro, which runs `lerd uninstall --keep-data` inside it, or to delete it with everything in it. Either way it removes Lerd's Windows side: PATH entry, login agent, DNS rule and `%LOCALAPPDATA%\lerd`, and the desktop app with its registration.
+Uninstalling asks whether to keep the distro, which runs `lerd uninstall --keep-data` inside it, or to delete it with everything in it. Either way it removes Lerd's Windows side: PATH entry, login agent, DNS rule and `%LOCALAPPDATA%\lerd`, the desktop app with its registration, and the root certificate Setup trusted, after Windows asks to confirm. A silent uninstall has nobody to answer that question, so it leaves the certificate trusted and notes it in its log.
 
 ## Contributing
 

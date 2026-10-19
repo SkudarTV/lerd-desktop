@@ -119,6 +119,7 @@ UninstallDeleteDistro=Delete the distro%nEverything in it goes, projects include
 UninstallConfirmDelete=This deletes %1 with every file in it, including your projects and databases. It cannot be undone.%n%nDelete it?
 UninstallLerd=Removing Lerd from %1...
 UninstallDistro=Deleting %1...
+UninstallCA=Removing Lerd's certificate authority...
 UninstallWindows=Removing Lerd from Windows...
 
 
@@ -152,6 +153,8 @@ const
   SudoersDropIn = '/etc/sudoers.d/zz-lerd-setup';
   LxssKey = 'Software\Microsoft\Windows\CurrentVersion\Lxss';
   RunKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
+  { Lerd's own settings: the thumbprint of the CA Setup trusted, for uninstall. }
+  LerdKey = 'Software\Lerd';
   { The AppUserModelID lerd's own toasts use, shared by the desktop app. }
   ToastAppID = 'sh.lerd.Lerd';
 
@@ -890,9 +893,13 @@ begin
   { No CA means .localhost mode, which has no certificates to trust. }
   if CaptureLines(WSLExe, AsUser('cp "$(~/.local/share/lerd/bin/mkcert -CAROOT)/rootCA.pem" "$(wslpath ''' + Crt + ''')"'), Lines) <> 0 then
     Exit;
-  if PowerShell('$c = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 ''' + Crt + '''; ' +
-    'if (Test-Path (''Cert:\CurrentUser\Root\'' + $c.Thumbprint)) { ''trusted'' }', Lines)
-    and (GetArrayLength(Lines) > 0) and (Lines[0] = 'trusted') then
+  if not PowerShell('$c = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2 ''' + Crt + '''; ' +
+    '$c.Thumbprint; if (Test-Path (''Cert:\CurrentUser\Root\'' + $c.Thumbprint)) { ''trusted'' }', Lines)
+    or (GetArrayLength(Lines) = 0) then
+    Exit;
+  { Uninstall takes back exactly this certificate and no other mkcert CA. }
+  RegWriteStringValue(HKCU, LerdKey, 'CAThumbprint', Lines[0]);
+  if (GetArrayLength(Lines) > 1) and (Lines[1] = 'trusted') then
     Exit;
   SetStatus(CustomMessage('StepCA'));
   if not WizardSilent then
@@ -1191,6 +1198,26 @@ end;
   does the same from inside the distro; this covers a distro that is gone. It
   also stops the desktop app, so its folder can go, and takes back what
   RegisterDesktopApp wrote. }
+{ UntrustCA removes the root CA TrustCA added. Windows asks before a root
+  certificate leaves the store, as it asked when it came in, so a silent
+  uninstall, with nobody to answer, leaves it trusted and says so in the log. }
+procedure UntrustCA;
+var
+  Thumb: String;
+  Code: Integer;
+begin
+  if not RegQueryStringValue(HKCU, LerdKey, 'CAThumbprint', Thumb) or (Thumb = '') then
+    Exit;
+  if UninstallSilent then
+  begin
+    Log('Left Lerd''s CA ' + Thumb + ' trusted: removing it needs Windows'' confirmation');
+    Exit;
+  end;
+  UninstallProgressForm.StatusLabel.Caption := CustomMessage('UninstallCA');
+  Exec(ExpandConstant('{sys}\certutil.exe'), '-delstore -user Root ' + Thumb, '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Log(Format('certutil -delstore exited with %d', [Code]));
+end;
+
 procedure RemoveWindowsSide;
 var
   Lines: TArrayOfString;
@@ -1240,5 +1267,7 @@ begin
     end;
   end;
   RemoveWindowsSide;
+  UntrustCA;
+  RegDeleteKeyIncludingSubkeys(HKCU, LerdKey);
   RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\RunOnce', 'lerd-setup');
 end;
