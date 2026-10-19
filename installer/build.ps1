@@ -60,7 +60,9 @@ Write-Ico (Join-Path $assets 'lerd.ico') @(16, 24, 32, 48, 64, 256)
 # Wizard images at 100%, 125%, 150%, 200% and 250% DPI, as Inno's modern style expects.
 $i = 0
 foreach ($scale in 1.0, 1.25, 1.5, 2.0, 2.5) {
-    $small = Resize $logo ([int](58 * $scale)) ([int](58 * $scale)) ([System.Drawing.Color]::White) 1.0
+    # Inno puts the header image flush against the window's right edge, so the
+    # logo gets a white margin of its own inside the box.
+    $small = Resize $logo ([int](58 * $scale)) ([int](58 * $scale)) ([System.Drawing.Color]::White) 0.7
     $small.Save((Join-Path $assets "wizard-small-$i.bmp"), [System.Drawing.Imaging.ImageFormat]::Bmp)
     $small.Dispose()
     $large = Resize $logo ([int](164 * $scale)) ([int](314 * $scale)) $brand 0.8
