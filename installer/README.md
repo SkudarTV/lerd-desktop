@@ -28,7 +28,7 @@ That's the whole point: **Lerd on Windows should feel like any other Windows app
 - 🔁 **Survives the reboot.** When Windows needs a restart, the installer picks up where it left off after you sign back in.
 - 🌐 **`.test` domains in your Windows browser**, over HTTPS with Lerd's certificate trusted by Windows. Or plain `.localhost` over HTTP if you prefer.
 - 🖥️ **The Lerd desktop app.** The dashboard in its own window and Lerd's icon in the tray, with native Windows notifications for mail, failing workers and finished jobs. It starts with Windows.
-- 🛟 **Safe to run again.** Every step checks before it acts, so if anything fails, run it again and it carries on from that point. A live log under the progress bar shows what each step is doing.
+- 🛟 **Safe to run again.** Every step checks before it acts, so if anything fails, run it again and it carries on from that point. The step under way shows above the progress bar, and Show details opens the full live log.
 - 🧹 **Clean uninstall.** Remove it from Add/Remove Programs. You choose whether to keep your Linux distro and your data, and either way it removes everything Lerd added to Windows.
 - 🔄 **Always the latest Lerd.** The installer carries no Lerd binaries, it fetches the current release, so an older installer never installs an older Lerd.
 

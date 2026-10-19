@@ -96,6 +96,8 @@ StepDownload=Downloading %1 (%2 of %3 MB)
 StepDistro=Installing %1...
 StepUser=Creating the Linux user %1...
 StepPackages=Installing Podman and the packages lerd needs...
+ShowDetails=Show details
+HideDetails=Hide details
 StepLerd=Installing lerd inside %1...
 StepIntegration=Connecting lerd with Windows...
 StepStart=Starting lerd...
@@ -165,10 +167,14 @@ var
   Failed: String;
   DeleteDistro: Boolean;
   DetailMemo: TNewMemo;
+  DetailsButton: TNewButton;
   DownloadName: String;
 
 function SetEnvironmentVariable(lpName, lpValue: String): BOOL;
   external 'SetEnvironmentVariableW@kernel32.dll stdcall';
+
+function EnableWindow(hWnd: HWND; bEnable: BOOL): BOOL;
+  external 'EnableWindow@user32.dll stdcall';
 
 { ---- running commands ---------------------------------------------------- }
 
@@ -331,6 +337,10 @@ begin
   begin
     WizardForm.FilenameLabel.Caption := Trim(L);
     AddDetail(L);
+    { Inno disables the wizard while a command runs, which would leave Show
+      details dead for the whole install. Cancel is disabled on its own, so
+      nothing else becomes clickable. }
+    EnableWindow(WizardForm.Handle, True);
   end;
 end;
 
@@ -544,6 +554,15 @@ begin
   Lbl.Caption := CustomMessage('OptionsPageSub');
 end;
 
+procedure DetailsButtonClick(Sender: TObject);
+begin
+  DetailMemo.Visible := not DetailMemo.Visible;
+  if DetailMemo.Visible then
+    DetailsButton.Caption := CustomMessage('HideDetails')
+  else
+    DetailsButton.Caption := CustomMessage('ShowDetails');
+end;
+
 procedure InitializeWizard;
 begin
   FeaturesOn := WSLFeaturesEnabled;
@@ -561,10 +580,22 @@ begin
 
   CreateOptionsPage(UserPage.ID);
 
+  { The status line above the progress bar is enough for most installs; the
+    full output stays one click away. }
+  DetailsButton := TNewButton.Create(WizardForm);
+  DetailsButton.Parent := WizardForm.InstallingPage;
+  DetailsButton.Left := WizardForm.ProgressGauge.Left;
+  DetailsButton.Top := WizardForm.ProgressGauge.Top + WizardForm.ProgressGauge.Height + ScaleY(12);
+  DetailsButton.Width := ScaleX(110);
+  DetailsButton.Height := WizardForm.NextButton.Height;
+  DetailsButton.Caption := CustomMessage('ShowDetails');
+  DetailsButton.OnClick := @DetailsButtonClick;
+
   DetailMemo := TNewMemo.Create(WizardForm);
   DetailMemo.Parent := WizardForm.InstallingPage;
+  DetailMemo.Visible := False;
   DetailMemo.Left := WizardForm.ProgressGauge.Left;
-  DetailMemo.Top := WizardForm.ProgressGauge.Top + WizardForm.ProgressGauge.Height + ScaleY(12);
+  DetailMemo.Top := DetailsButton.Top + DetailsButton.Height + ScaleY(8);
   DetailMemo.Width := WizardForm.ProgressGauge.Width;
   DetailMemo.Height := WizardForm.InstallingPage.ClientHeight - DetailMemo.Top;
   DetailMemo.Anchors := [akLeft, akTop, akRight, akBottom];
