@@ -1235,6 +1235,7 @@ begin
     '$b = Join-Path $d ''bin''; $p = [Environment]::GetEnvironmentVariable(''Path'', ''User''); ' +
     'if ($p) { [Environment]::SetEnvironmentVariable(''Path'', (($p -split '';'') | Where-Object { $_ -and $_ -ne $b }) -join '';'', ''User'') }; ' +
     'Get-DnsClientNrptRule | Where-Object { $_.Comment -eq ''lerd'' } | Remove-DnsClientNrptRule -Force; Clear-DnsClientCache; ' +
+    'Remove-NetFirewallHyperVRule -Name ''lerd-lan'' -ErrorAction SilentlyContinue; ' +
     'Start-Sleep 3; ' +
     'Get-Process -Name lerd -ErrorAction SilentlyContinue | Where-Object { $_.Path -like ($b + ''\*'') } | Stop-Process -Force; ' +
     'for ($i = 0; $i -lt 10 -and (Test-Path $d); $i++) { Remove-Item $d -Recurse -Force -ErrorAction SilentlyContinue; Start-Sleep 1 }',
