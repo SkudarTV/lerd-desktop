@@ -930,7 +930,7 @@ begin
   Result := Run(FmtMessage(CustomMessage('StepLerd'), [Distro]), WSLExe, AsUser(Script))
     and ApplyOptions
     and TrustCA
-    and Run(CustomMessage('StepIntegration'), WSLExe, AsUser('~/.local/bin/lerd wsl:setup'))
+    and Run(CustomMessage('StepIntegration'), WSLExe, AsUser('LERD_WSL_RESTART_HANDLED=1 ~/.local/bin/lerd wsl:setup'))
     { The desktop app only receives lerd's notifications from the native sink;
       the browser sink, lerd's default, sends them to dashboard pages. }
     and Run(CustomMessage('StepNotify'), WSLExe, AsUser('~/.local/bin/lerd notify target native'));
