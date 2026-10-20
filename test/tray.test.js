@@ -222,7 +222,9 @@ test('tooltip tells running, stopped and unreachable apart', () => {
 
 test('parseWslConf reads the distro and lerd\'s path', () => {
   assert.deepStrictEqual(tray.parseWslConf('distro=Ubuntu-24.04\r\nlerd=/home/me/.local/bin/lerd\r\ntld=test\r\n'),
-    { distro: 'Ubuntu-24.04', lerd: '/home/me/.local/bin/lerd' })
+    { distro: 'Ubuntu-24.04', lerd: '/home/me/.local/bin/lerd', user: '' })
+  assert.deepStrictEqual(tray.parseWslConf('distro=Ubuntu-24.04\nlerd=/home/me/.local/bin/lerd\nuser=me\n'),
+    { distro: 'Ubuntu-24.04', lerd: '/home/me/.local/bin/lerd', user: 'me' })
   assert.strictEqual(tray.parseWslConf('tld=test\n'), null)
 })
 
@@ -250,6 +252,12 @@ test('lerdCommand falls back to wsl.exe when the shim is gone', () => {
   })
   assert.strictEqual(tray.lerdCommand(['start'], { ...WIN, ...files({ [conf]: CONF }) }).file,
     'C:\\Windows\\System32\\wsl.exe', 'System32\'s wsl.exe when the WSL package is not where it installs')
+})
+
+test('lerdCommand runs the fallback as lerd\'s user, not the distro\'s default', () => {
+  const conf = 'C:\\Users\\me\\AppData\\Local\\lerd\\bin\\lerd-wsl.conf'
+  const got = tray.lerdCommand(['start'], { ...WIN, ...files({ [conf]: CONF + 'user=me\n' }) })
+  assert.deepStrictEqual(got.args, ['-d', 'Ubuntu-24.04', '-u', 'me', '--cd', '~', '--exec', '/home/me/.local/bin/lerd', 'start'])
 })
 
 test('lerdCommand gives up when lerd was never set up on Windows', () => {

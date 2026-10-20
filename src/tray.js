@@ -218,7 +218,7 @@ function parseWslConf(text) {
     const i = line.indexOf('=')
     if (i > 0) conf[line.slice(0, i).trim()] = line.slice(i + 1).trim()
   }
-  return conf.distro && conf.lerd ? { distro: conf.distro, lerd: conf.lerd } : null
+  return conf.distro && conf.lerd ? { distro: conf.distro, lerd: conf.lerd, user: conf.user || '' } : null
 }
 
 // lerdCommand is how to run lerd with args from Windows: through the shim
@@ -247,7 +247,9 @@ function lerdCommand(args, {
   // The WSL package's own wsl.exe; System32's is a stub until it is installed.
   const packaged = path.win32.join(programFiles, 'WSL', 'wsl.exe')
   const wsl = exists(packaged) ? packaged : path.win32.join(systemRoot, 'System32', 'wsl.exe')
-  return { file: wsl, args: ['-d', conf.distro, '--cd', '~', '--exec', conf.lerd, ...args] }
+  // As lerd's user, not the distro's default one, which can be root.
+  const user = conf.user ? ['-u', conf.user] : []
+  return { file: wsl, args: ['-d', conf.distro, ...user, '--cd', '~', '--exec', conf.lerd, ...args] }
 }
 
 module.exports = {
