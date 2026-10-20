@@ -40,7 +40,7 @@ Download `Install-Lerd.exe` from the [latest release](https://github.com/lerd-en
 
 ## How it works
 
-The installer is a bootstrapper, the native-wizard counterpart of `lerd.exe --setup` (`cmd/lerd-windows/setup.go`). It prepares Windows and hands Lerd itself to `install.sh`. It ships with the desktop app and carries the app's version.
+The installer is a bootstrapper: it prepares Windows and hands Lerd itself to `install.sh`, the way `install.ps1` does from a PowerShell window. It ships with the desktop app and carries the app's version.
 
 1. **WSL features.** Enables `Microsoft-Windows-Subsystem-Linux` and `VirtualMachinePlatform` and offers the restart they need. Setup registers itself in `RunOnce` and resumes after you sign back in with the same account.
 2. **WSL.** Installs the latest MSI from github.com/microsoft/WSL. Setup only ever runs the real `wsl.exe` in `C:\Program Files\WSL`; the System32 stub opens its own window offering to install WSL.
@@ -50,14 +50,14 @@ The installer is a bootstrapper, the native-wizard counterpart of `lerd.exe --se
 6. **Desktop app.** Downloads `lerd-desktop-win32-<arch>.zip` from the latest lerd-env/lerd-desktop release into `{app}\desktop`, unless that release is the one already there, and registers it for the signed-in user: the `sh.lerd.Lerd` app ID with Lerd's logo, which its notifications are posted under, the `lerd://` scheme, a Start menu shortcut and a `lerd-desktop` Run entry that starts it hidden in the tray at sign-in. The app holds Lerd's tray icon and notifications on Windows, keeps Lerd's agent running, and has no installer of its own. It comes before Lerd so that `wsl:setup` finds it and leaves the agent to it: started from a Run entry of its own, the unsigned agent reads to Windows Defender as malware making itself persistent, and Defender has quarantined it for that.
 7. **Lerd.** Runs `install.sh`.
 8. **Certificate.** Imports Lerd's root CA into the Windows user's store from Setup itself, so Windows' confirmation comes to the front. Declining only leaves a browser warning.
-9. **Windows integration**: `lerd wsl:setup`, then `lerd notify target native`, since the desktop app only receives Lerd's notifications from the native sink.
+9. **Windows integration**: `lerd wsl:setup`, which puts `lerd.exe` and its shims on PATH and, behind one administrator prompt, adds the DNS rule for the site TLD and the `lerd-lan` firewall rule that lets the local network reach LAN shares. Then `lerd notify target native`, since the desktop app only receives Lerd's notifications from the native sink.
 10. **Start.** Restarts WSL, waits for the dashboard, and starts the desktop app in the tray, which starts Lerd's agent. The finish page offers to open the app, ends with `install.sh`'s GitHub star note, and has an unticked option to open github.com/lerd-env/lerd.
 
 Every Linux command runs under `setsid -w ... </dev/null`: Setup's hidden console still gives WSL a pty, and a question read from `/dev/tty` would wait forever. Detached, every question takes its default. The user has passwordless sudo (`/etc/sudoers.d/zz-lerd-setup`) only while steps 7 to 9 run.
 
 The full log is in `%TEMP%\Setup Log *.txt`. Silent installs are not supported, since the Linux user's password comes from the wizard.
 
-Uninstalling asks whether to keep the distro, which runs `lerd uninstall --keep-data` inside it, or to delete it with everything in it. Either way it removes Lerd's Windows side: PATH entry, login agent, DNS rule and `%LOCALAPPDATA%\lerd`, the desktop app with its registration, and the root certificate Setup trusted, after Windows asks to confirm. A silent uninstall has nobody to answer that question, so it leaves the certificate trusted and notes it in its log.
+Uninstalling asks whether to keep the distro, which runs `lerd uninstall --keep-data` inside it, or to delete it with everything in it. Either way it removes Lerd's Windows side: PATH entry, login agent, DNS rule, the `lerd-lan` firewall rule and `%LOCALAPPDATA%\lerd`, the desktop app with its registration, and the root certificate Setup trusted, after Windows asks to confirm. A silent uninstall has nobody to answer that question, so it leaves the certificate trusted and notes it in its log.
 
 ## Contributing
 
@@ -73,15 +73,13 @@ winget install JRSoftware.InnoSetup
 
 ### Testing an unreleased build
 
-`/local=<folder>` (or the `LERD_SETUP_LOCAL` environment variable) installs Lerd from a Windows folder holding `install.sh`, `lerd` and `lerd.exe` instead of the latest release. `make build` in lerd-wsl leaves `lerd` and `lerd.exe` in `build\`; copy `install.sh` beside them:
+`/local=<folder>` (or the `LERD_SETUP_LOCAL` environment variable) installs Lerd from a Windows folder holding `install.sh`, `lerd` and `lerd.exe` instead of the latest release. `make build` in a lerd checkout leaves `lerd` and `lerd.exe` in `build\`; copy `install.sh` beside them:
 
 ```powershell
-dist\Install-Lerd.exe /local=C:\path\to\lerd-wsl\build
+dist\Install-Lerd.exe /local=C:\path\to\lerd\build
 ```
 
 The same folder can hold an unreleased desktop app: `npm run package:win` in lerd-desktop leaves `lerd-desktop-win32-x64.zip` (and the arm64 one) in its `dist\`; copy the one for the machine beside the rest. Setup takes the app from there when it is present, and from the latest lerd-desktop release otherwise.
-
-`..\lerd-test-vm` has double-click scripts for a Hyper-V test VM that roll back to a clean Windows, or one with the WSL features already enabled, and copy the installer (and a local build) into it.
 
 ### Versions and releases
 
@@ -97,7 +95,7 @@ The installer only changes when one of the things it relies on does:
 | `Ubuntu-24.04` | a newer Ubuntu LTS should be the default |
 | `https://lerd.sh/install.sh`, `lerd wsl:setup`, `lerd dns:disable`, `lerd node:unmanage`, `lerd uninstall --keep-data` | one of them moves or changes its meaning |
 | Lerd's mkcert at `~/.local/share/lerd/bin/mkcert` | Lerd moves it |
-| Lerd's Windows side: `%LOCALAPPDATA%\lerd`, the `lerd` Run key, the NRPT rule commented `lerd`, the `sh.lerd.Lerd` toast app ID | Lerd changes how `wsl:setup` installs it, so uninstalling still cleans up |
+| Lerd's Windows side: `%LOCALAPPDATA%\lerd`, the `lerd` Run key, the NRPT rule commented `lerd`, the `lerd-lan` Hyper-V firewall rule, the `sh.lerd.Lerd` toast app ID | Lerd changes how `wsl:setup` installs it, so uninstalling still cleans up |
 | microsoft/WSL release assets named `*.x64.msi` / `*.arm64.msi` | Microsoft renames them |
 | lerd-env/lerd-desktop release assets named `lerd-desktop-win32-x64.zip` / `lerd-desktop-win32-arm64.zip`, with `lerd-desktop.exe` at their root | lerd-desktop renames them or the executable |
 | `lerd notify target native` | Lerd renames the command, or the desktop app's notifications move off the native sink |
