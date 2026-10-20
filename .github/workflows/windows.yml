@@ -1,0 +1,61 @@
+name: Package for Windows
+
+# Packages the Windows app into lerd-desktop-win32-<arch>.zip and builds
+# Install-Lerd.exe from installer/. Every push and pull request keeps them as run
+# artifacts; a published release also gets them as assets, which is where the
+# installer downloads the app from.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test
+
+      - run: npm run package:win
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lerd-desktop-win32
+          path: dist/lerd-desktop-win32-*.zip
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      # The installer carries the app's version, so a release names one thing.
+      - name: Build the installer
+        shell: pwsh
+        run: ./installer/build.ps1 -Version (Get-Content package.json | ConvertFrom-Json).version
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Install-Lerd
+          path: installer/dist/Install-Lerd.exe
+          if-no-files-found: error
+
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/lerd-desktop-win32-x64.zip dist/lerd-desktop-win32-arm64.zip installer/dist/Install-Lerd.exe --clobber
