@@ -1042,7 +1042,7 @@ begin
   else
   begin
     if not PowerShell('[Net.ServicePointManager]::SecurityProtocol = ''Tls12''; ' +
-      '$r = Invoke-RestMethod https://api.github.com/repos/lerd-env/lerd-desktop/releases/latest; ' +
+      '$r = Invoke-RestMethod https://api.github.com/repos/SkudarTV/lerd-desktop/releases/latest; ' +
       '$a = $r.assets | Where-Object { $_.name -eq ''' + DesktopZipName + ''' } | Select-Object -First 1; ' +
       'if ($a) { $r.tag_name; $a.browser_download_url }', Lines)
       or (GetArrayLength(Lines) < 2) then
